@@ -11,7 +11,7 @@ import pandas as pd
 # ============================================================
 
 # Path to folder containing processed OCT volumes (update this to your local path)
-OUT_DIR = "path/to/all_output"
+OUT_DIR = "path/to/folder"
 
 # Output Excel file
 OUTPUT_FILE = os.path.join(OUT_DIR, "volume_level_features_90cols.xlsx")
