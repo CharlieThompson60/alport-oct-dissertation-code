@@ -11,7 +11,7 @@ from scipy import stats
 # ============================================================
 
 # Path to the folder containing the extracted feature spreadsheet
-OUT_DIR = "path/to/file"
+OUT_DIR = "path/to/folder"
 
 # Input file from the feature extraction step
 INPUT_FILE = os.path.join(OUT_DIR, "volume_level_features_90cols.xlsx")
