@@ -1,155 +1,125 @@
-Overview
+# alport-oct-dissertation-code
 
+## Overview
 This repository contains the code developed for a final-year project investigating whether OCT-derived retinal features can predict systemic manifestations of Alport syndrome.
 
 The pipeline extracts ETDRS-based features from retinal thickness maps, performs preprocessing and statistical analysis, and applies machine learning models to evaluate predictive performance and feature importance.
 
-Repository Structure
-etdrs_feature_extraction.py
+---
 
+## Repository Structure
+
+### `etdrs_feature_extraction.py`
 Extracts ETDRS-grid features from OCT-derived retinal thickness maps.
 
-Key steps:
+**Key steps:**
+- Loads layer-wise thickness maps (`.npy` files)
+- Estimates foveal centre from total thickness map
+- Applies ETDRS sector masks (central, inner, outer)
+- Computes mean thickness values across 9 sectors
+- Outputs **90 features per scan** (9 layers × 10 regions)
 
-Loads layer-wise thickness maps (NumPy arrays)
+---
 
-Estimates foveal centre from total thickness
+### `preprocessing.py`
+Prepares the extracted features for analysis.
 
-Applies ETDRS sector masks (central, inner, outer)
+**Key steps:**
+- Loads feature dataset
+- Cleans and standardises data
+- Handles missing values
+- Ensures consistent formatting across patients and volumes
 
-Computes mean thickness values across 9 sectors
+---
 
-Outputs 90 features per scan (9 layers × 10 regions)
+### `statistical_analysis.py`
+Performs statistical comparisons of OCT features across clinical groups.
 
-preprocessing.py
+**Key steps:**
+- Converts clinical labels to binary variables (e.g. SNHL, eGFR threshold)
+- Computes **point-biserial correlations** (effect size)
+- Performs **Mann–Whitney U tests**
+- Aggregates results at:
+  - Volume level
+  - Patient level
+- Produces layer-level summary statistics
 
-Prepares the extracted features for downstream analysis.
+---
 
-Key steps:
-
-Loads feature dataset
-
-Cleans missing values
-
-Standardises formatting and structure
-
-Ensures consistency across volumes and patients
-
-statistical_analysis.py
-
-Performs statistical comparison of OCT features across clinical groups.
-
-Key steps:
-
-Converts clinical labels to binary variables (e.g. SNHL, eGFR threshold)
-
-Computes point-biserial correlations (effect sizes)
-
-Performs Mann–Whitney U tests
-
-Aggregates results at both volume-level and patient-level
-
-Produces layer-level summary statistics
-
-models.py
-
+### `models.py`
 Main modelling pipeline for predictive analysis.
 
-Key features:
+**Supported configurations:**
+- **Targets:**
+  - SNHL (hearing loss)
+  - eGFR classification
+- **Feature modes:**
+  - OCT-only
+  - Clinical-only
+  - Combined OCT + clinical
 
-Supports multiple analysis modes:
+**Models implemented:**
+- Random Forest
+- Multi-layer Perceptron (MLP)
 
-OCT-only
+**Pipeline components:**
+- Grouped cross-validation (**patient-level separation**)
+- Feature importance methods:
+  - Permutation importance
+  - Model-based importance (MDI / connection weights)
+  - SHAP values
+- Feature selection:
+  - Importance-based feature pool
+  - Random subset search (OCT/combined)
+  - Exhaustive subset search (clinical-only)
+- Robustness analysis across multiple random seeds
 
-Clinical-only
+**Outputs:**
+- Feature importance tables
+- Ranked feature summaries
+- Optimal feature subsets
+- Model performance metrics
 
-Combined OCT + clinical features
+---
 
-Supports multiple targets:
+## How to Use
 
-SNHL (hearing loss)
-
-eGFR classification
-
-Methods implemented:
-
-Random Forest classifier
-
-Multi-layer Perceptron (MLP)
-
-Pipeline components:
-
-Grouped cross-validation (patient-level separation)
-
-Feature importance:
-
-Permutation importance
-
-Model-specific importance (MDI / connection weights)
-
-SHAP values
-
-Feature selection:
-
-Importance-based feature pool
-
-Random subset search (OCT/combined)
-
-Exhaustive subset search (clinical-only)
-
-Robustness analysis across multiple random seeds
-
-Outputs:
-
-Feature importance tables
-
-Ranked feature summaries
-
-Optimal feature subsets
-
-Model performance metrics
-
-How to Use
-
-Set the base directory in each script:
-
+1. Set your data directory in each script:
+```python
 OUT_DIR = "path/to/your/data"
+```
 
-Ensure the input dataset is placed in this directory.
+2. Place your dataset in this directory.
 
-Run the scripts in order:
+3. Run the pipeline in order:
 
-1. etdrs_feature_extraction.py
-2. preprocessing.py
-3. statistical_analysis.py
-4. models.py
+```
+etdrs_feature_extraction.py
+preprocessing.py
+statistical_analysis.py
+models.py
+```
 
-Results will be saved automatically to structured output folders.
+4. Outputs will be saved automatically to structured result folders.
 
-Key Assumptions
+---
 
-Input OCT data has already been segmented into retinal layers.
+## Key Assumptions
 
-Thickness maps are stored as .npy arrays.
+- OCT data has already been segmented into retinal layers
+- Thickness maps are stored as `.npy` arrays
+- Clinical dataset includes:
+  - `patient_id`
+  - SNHL status (Yes/No)
+  - eGFR values
+  - Additional clinical covariates
+- **Patient-level grouping is enforced** to prevent data leakage
+- Left eyes are flipped horizontally to standardise anatomical orientation
 
-Clinical dataset includes:
+---
 
-Patient identifiers (patient_id)
+## Notes
 
-SNHL status (Yes/No)
-
-eGFR values
-
-Additional clinical covariates
-
-Patient-level grouping is required to avoid data leakage (enforced via grouped cross-validation).
-
-Left eyes are horizontally flipped to standardise anatomical orientation.
-
-Notes
-
-No patient-identifiable information is included in this repository.
-
-File paths must be updated locally before running the scripts.
-
-The modelling pipeline is computationally intensive, particularly when running SHAP and subset selection stages.
+- No patient-identifiable information is included in this repository
+- File paths must be updated locally before running
+- The modelling pipeline is computationally intensive (especially SHAP and subset search)
