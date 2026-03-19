@@ -20,7 +20,7 @@ OUTPUT_FILE = os.path.join(OUT_DIR, "volume_level_features_90cols.xlsx")
 # Expected columns: patient_id, volume, eye
 LATERALITY_OVERRIDE_CSV = None
 
-SECTORS = ["C", "I_UR", "I_UL", "I_LR", "I_LL", "O_UR", "O_UL", "O_LR", "O_LL"]
+SECTORS = ["C", "I_S", "I_N", "I_I", "I_T", "O_S", "O_N", "O_I", "O_T"]
 SECTOR_COLUMNS = [f"{s}_mean_px" for s in SECTORS]
 
 LAYER_ORDER = ["GCIPL", "INL", "mRNFL", "MZ", "OL", "ONL", "OPL", "RPE", "Thickness_total"]
@@ -297,40 +297,68 @@ def find_foveal_centre(total_map: np.ndarray, centre_frac: float = 0.35):
 
 def etdrs_masks_mm_calibrated(shape, centre):
     """
-    Builds ETDRS-style masks using a 6 mm field of view and the
-    estimated foveal centre.
+    Builds standard ETDRS sector masks using a 6 mm field of view
+    and the estimated foveal centre.
+
+    Sectors follow the classic ETDRS diagonal convention with
+    boundaries at 45/135/225/315 degrees, giving four anatomical
+    quadrants (Superior, Nasal, Inferior, Temporal) within each
+    annular ring, matching the published ETDRS grid diagram.
+
+    Angle convention (after left-eye horizontal flip):
+        0 deg   = temporal  (right in image)
+        90 deg  = superior  (up in image)
+        180 deg = nasal     (left in image)
+        270 deg = inferior  (down in image)
+
+    Sector boundaries at 45-degree diagonals:
+        Superior (S):  45 <= angle < 135
+        Nasal    (N): 135 <= angle < 225
+        Inferior (I): 225 <= angle < 315
+        Temporal (T): 315 <= angle < 360 and 0 <= angle < 45
+
+    Left eyes are flipped horizontally before this function is
+    called (see normalise_laterality), so nasal/temporal labels
+    are anatomically consistent across both eyes.
     """
     height, width = shape
     cy, cx = centre
 
     yy, xx = np.indices((height, width))
-    dy = yy - cy
-    dx = xx - cx
+    dy = (yy - cy).astype(float)
+    dx = (xx - cx).astype(float)
     r = np.sqrt(dx**2 + dy**2)
 
-    r_c = R_C_MM * PX_PER_MM
-    r_in = R_IN_MM * PX_PER_MM
+    # atan2(-dy, dx): negative dy because image y-axis points down,
+    # so flipping gives standard mathematical orientation where
+    # positive y = superior. Result is in [-180, 180]; shift to [0, 360].
+    angle = np.degrees(np.arctan2(-dy, dx)) % 360
+
+    # Annular ring boundaries
+    r_c   = R_C_MM  * PX_PER_MM
+    r_in  = R_IN_MM * PX_PER_MM
     r_out = R_OUT_MM * PX_PER_MM
 
     central = r <= r_c
-    inner = (r > r_c) & (r <= r_in)
-    outer = (r > r_in) & (r <= r_out)
+    inner   = (r > r_c)  & (r <= r_in)
+    outer   = (r > r_in) & (r <= r_out)
 
-    up = dy < 0
-    down = ~up
-    left = dx < 0
-    right = ~left
+    # 45-degree diagonal sector assignments
+    superior = (angle >= 45)  & (angle <  135)
+    nasal    = (angle >= 135) & (angle <  225)
+    inferior = (angle >= 225) & (angle <  315)
+    temporal = ~(superior | nasal | inferior)  # 315-360 and 0-45
 
     return {
-        "C": central,
-        "I_UR": inner & up & right,
-        "I_UL": inner & up & left,
-        "I_LR": inner & down & right,
-        "I_LL": inner & down & left,
-        "O_UR": outer & up & right,
-        "O_UL": outer & up & left,
-        "O_LR": outer & down & right,
-        "O_LL": outer & down & left,
+        "C":   central,
+        "I_S": inner & superior,
+        "I_N": inner & nasal,
+        "I_I": inner & inferior,
+        "I_T": inner & temporal,
+        "O_S": outer & superior,
+        "O_N": outer & nasal,
+        "O_I": outer & inferior,
+        "O_T": outer & temporal,
     }
 
 
@@ -349,7 +377,7 @@ def sector_means(thickness_map: np.ndarray, masks: dict):
 def normalise_laterality(arr2d: np.ndarray, eye: str):
     """
     Flips left-eye maps horizontally so that all scans share a
-    common anatomical orientation.
+    common anatomical orientation (temporal always on the right).
     """
     return np.fliplr(arr2d) if eye == "L" else arr2d
 
